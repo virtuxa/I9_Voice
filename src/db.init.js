@@ -12,12 +12,22 @@ const pool = new Pool({
 // Инициализация базы данных
 const initDatabase = async () => {
     try {
-        // Таблица (users) пользователей
+        // Таблица ( users ) пользователей
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
             password VARCHAR(255) NOT NULL
+            );
+        `);
+
+        // Таблица ( refresh_tokens ) обновления токенов
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS refresh_tokens (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                token TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
 

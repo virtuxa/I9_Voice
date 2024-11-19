@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { pool } = require('../db.init');
+const { pool } = require('../db.init.js');
 
 
 // Функция регистрации
@@ -71,7 +71,11 @@ const login = async (req, res) => {
             , { expiresIn: '7d' }
         );
 
-        // TODO: Сделать добавление в таблицу
+        // Добавляем refresh токен в таблицу
+        await pool.query(
+            'INSERT INTO refresh_tokens (user_id, token) VALUES ($1, $2)',
+            [user.id, refreshToken]
+        );
 
         res.status(200).json({
             message: 'Авторизация прошла успешна',
@@ -85,20 +89,30 @@ const login = async (req, res) => {
 }
 
 // Функция выхода
-const logout = ( req, res ) => {
+const logout = async ( req, res ) => {
     try {
-        const accessToken = req.headers.authorization?.split(' ')[1];
+        const { refreshToken } = req.body; // Принимаем токен из тела запроса
 
-        if ( !accessToken ) {
+        if ( !refreshToken ) {
             return res.status( 401 ).json({ message: 'Токен отсутствует.' });
         }
 
-        // Проверка токена
-        jwt.verify( accessToken, process.env.JWT_SECRET, ( err, decoded ) => {
+        // Проверяем, существует ли токен в базе
+        const result = await pool.query('SELECT * FROM refresh_tokens WHERE token = $1', [ refreshToken ]);
+        if (result.rows.length === 0) {
+            return res.status( 404 ).json({ message: 'Недействительный токен.' });
+        }
+
+        // Проверяем валидность токена
+        jwt.verify(refreshToken, process.env.REFRESH_SECRET, async (err, user) => {
             if ( err ) {
-                return res.status( 401 ).json({ message: 'Неверный тип или просроченный токен.' });
+                return res.status( 403 ).json({ message: 'Недействительный токен.' });
             }
-            res.status( 200 ).json({ message: 'Успешный выход' });
+
+            // Удаляем токен из базы
+            await pool.query('DELETE FROM refresh_tokens WHERE token = $1', [ refreshToken ]);
+
+            res.status( 200 ).json({ message: 'Успешный выход.' });
         });
     } catch ( error ) {
         console.error( 'Ошибка при выходе:', error );
@@ -106,4 +120,40 @@ const logout = ( req, res ) => {
     }
 }
 
-module.exports = { register, login, logout }
+// Функция обновления refresh токена
+const refreshToken = async (req, res) => {
+    try {
+        const { refreshToken } = req.body;
+
+        if ( !refreshToken ) {
+            return res.status( 401 ).json({ message: 'Токен отсутствует.' });
+        }
+
+        // Проверка токена в базе
+        const result = await pool.query('SELECT * FROM refresh_tokens WHERE token = $1', [ refreshToken ]);
+        if ( result.rows.length === 0 ) {
+            return res.status( 403 ).json({ message: 'Недействительный токен.' });
+        }
+
+        // Проверяем валидность токена
+        jwt.verify( refreshToken, process.env.REFRESH_SECRET, ( err, decoded ) => {
+            if ( err ) {
+                return res.status( 401 ).json({ message: 'Токен недействителен.' });
+            }
+
+            // Генерируем новый access token
+            const accessToken = jwt.sign(
+                { id: decoded.id, username: decoded.username }
+                , process.env.JWT_SECRET
+                , { expiresIn: '30s' }
+            );
+
+            res.status( 200 ).json({ accessToken });
+        });
+    } catch ( error ) {
+        console.error( 'Ошибка при обновлении токена:', error );
+        res.status( 500 ).json({ message: 'Ошибка сервера.' });
+    }
+};
+
+module.exports = { register, login, logout, refreshToken }

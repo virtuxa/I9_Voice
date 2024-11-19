@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 
 // Подключаем сторонние файлы
-const { initDatabase } = require('./src/db.init');
+const { initDatabase } = require('./src/db.init.js');
 
 // Подключаем src'шные файлы
 const authRoutes = require('./src/auth/auth.routes');
