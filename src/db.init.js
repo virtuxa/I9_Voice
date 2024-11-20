@@ -17,7 +17,9 @@ const initDatabase = async () => {
             CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL
+            password VARCHAR(255) NOT NULL,
+            status VARCHAR(50) DEFAULT 'offline',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
 
@@ -38,4 +40,16 @@ const initDatabase = async () => {
     }
 };
 
-module.exports = { pool, initDatabase };
+const removeExpiredTokens = async () => {
+    try {
+        const result = await pool.query(`
+            DELETE FROM refresh_tokens 
+            WHERE created_at + interval '7 days' < CURRENT_TIMESTAMP
+        `);
+        console.log(`Удалено ${result.rowCount} просроченных токенов.`);
+    } catch (error) {
+        console.error('Ошибка при удалении просроченных токенов:', error.message);
+    }
+};
+
+module.exports = { pool, initDatabase, removeExpiredTokens };
