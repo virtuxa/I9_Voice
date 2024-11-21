@@ -1,5 +1,5 @@
 const bcrypt = require('bcrypt');
-const { pool } = require('../db.init');
+const { pool } = require('../utils/db.init');
 
 // Получение профиля пользователя
 const getUserProfile = async (req, res) => {

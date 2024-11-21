@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware/auth.middleware');
+const { authenticateToken } = require('../utils/auth.middleware');
 const {
     getUserProfile
     , updateUserProfile

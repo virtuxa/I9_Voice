@@ -44,6 +44,39 @@ const initDatabase = async () => {
             );
         `);
 
+        // Таблица ( chats ) чаты
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS chats (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255), -- Название чата (только для групповых)
+                type VARCHAR(50) NOT NULL, -- 'private' или 'group'
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        // Таблица ( chat_members ) участники чатов
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS chat_members (
+                id SERIAL PRIMARY KEY,
+                chat_id INTEGER REFERENCES chats(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                role VARCHAR(50) DEFAULT 'member', -- 'admin', 'member'
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(chat_id, user_id) -- Запрет дублирования участников
+            );
+        `);
+
+        // Таблица ( messages ) сообщений
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS messages (
+                id SERIAL PRIMARY KEY,
+                chat_id INTEGER REFERENCES chats(id) ON DELETE CASCADE,
+                sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         console.log('Инициализация базы данных завершена.');
     } catch( error ) {
         console.error( 'Ошибка подключения к базе данных', error.message );

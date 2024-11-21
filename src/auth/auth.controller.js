@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { pool } = require('../db.init.js');
+const { pool } = require('../utils/db.init.js');
 
 
 // Функция регистрации
