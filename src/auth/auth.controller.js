@@ -78,7 +78,7 @@ const login = async (req, res) => {
         );
 
         // Обновляем статус пользователя на "online"
-        await pool.query('UPDATE users SET status = $1 WHERE id = $2', ['online', user.id]);
+        // await pool.query('UPDATE users SET status = $1 WHERE id = $2', ['online', user.id]);
 
         res.status(200).json({
             message: 'Авторизация прошла успешно',

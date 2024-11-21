@@ -178,6 +178,154 @@ const getStatus = async (req, res) => {
     }
 };
 
+// Добавление в друзья
+const addFriend = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { friendId } = req.params;
+
+        if (userId === parseInt(friendId, 10)) {
+            return res.status(400).json({ message: 'Нельзя добавить себя в друзья.' });
+        }
+
+        // Проверяем, существует ли пользователь
+        const userExists = await pool.query('SELECT * FROM users WHERE id = $1', [friendId]);
+        if (userExists.rows.length === 0) {
+            return res.status(404).json({ message: 'Пользователь не найден.' });
+        }
+
+        // Проверяем, нет ли уже запроса
+        const friendshipExists = await pool.query(
+            'SELECT * FROM friends WHERE user_id = $1 AND friend_id = $2',
+            [userId, friendId]
+        );
+        if (friendshipExists.rows.length > 0) {
+            return res.status(400).json({ message: 'Запрос уже существует.' });
+        }
+
+        // Добавляем запись в таблицу друзей
+        await pool.query(
+            'INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, $3)',
+            [userId, friendId, 'pending']
+        );
+
+        res.status(201).json({ message: 'Запрос дружбы отправлен.' });
+    } catch (error) {
+        console.error('Ошибка при добавлении в друзья:', error.message);
+        res.status(500).json({ message: 'Ошибка сервера.' });
+    }
+};
+
+// Принятие запроса дружбы
+const acceptFriend = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { friendId } = req.params;
+
+        const result = await pool.query(
+            'UPDATE friends SET status = $1 WHERE user_id = $2 AND friend_id = $3 RETURNING *',
+            ['accepted', friendId, userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Запрос дружбы не найден.' });
+        }
+
+        res.status(200).json({ message: 'Запрос дружбы принят.' });
+    } catch (error) {
+        console.error('Ошибка при принятии дружбы:', error.message);
+        res.status(500).json({ message: 'Ошибка сервера.' });
+    }
+};
+
+// Отклонение запроса дружбы
+const rejectFriend = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { friendId } = req.params;
+
+        const result = await pool.query(
+            'UPDATE friends SET status = $1 WHERE user_id = $2 AND friend_id = $3 RETURNING *',
+            ['rejected', friendId, userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Запрос дружбы не найден.' });
+        }
+
+        res.status(200).json({ message: 'Запрос дружбы отклонён.' });
+    } catch (error) {
+        console.error('Ошибка при отклонении дружбы:', error.message);
+        res.status(500).json({ message: 'Ошибка сервера.' });
+    }
+};
+
+// Удаление из друзей
+const deleteFriend = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { friendId } = req.params;
+
+        const result = await pool.query(
+            'DELETE FROM friends WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)',
+            [userId, friendId]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'Дружба не найдена.' });
+        }
+
+        res.status(200).json({ message: 'Пользователь удалён из друзей.' });
+    } catch (error) {
+        console.error('Ошибка при удалении друга:', error.message);
+        res.status(500).json({ message: 'Ошибка сервера.' });
+    }
+};
+
+// Получение списка друзей
+const getFriends = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const result = await pool.query(
+            `
+            SELECT u.id, u.username, f.created_at 
+            FROM friends f
+            JOIN users u ON (u.id = f.friend_id AND f.user_id = $1 AND f.status = 'accepted')
+            OR (u.id = f.user_id AND f.friend_id = $1 AND f.status = 'accepted')
+            `,
+            [userId]
+        );
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Ошибка при получении списка друзей:', error.message);
+        res.status(500).json({ message: 'Ошибка сервера.' });
+    }
+};
+
+// Получение списка запросов в друзья
+const getFriendRequests = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const result = await pool.query(
+            `
+            SELECT f.id AS request_id, u.id AS user_id, u.username, f.created_at 
+            FROM friends f
+            JOIN users u ON u.id = f.user_id
+            WHERE f.friend_id = $1 AND f.status = 'pending'
+            `,
+            [userId]
+        );
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Ошибка при получении запросов в друзья:', error.message);
+        res.status(500).json({ message: 'Ошибка сервера.' });
+    }
+};
+
 module.exports = {
     getUserProfile
     , updateUserProfile
@@ -187,4 +335,10 @@ module.exports = {
     , changePassword
     , updateStatus
     , getStatus
+    , addFriend
+    , acceptFriend
+    , rejectFriend
+    , deleteFriend
+    , getFriends
+    , getFriendRequests
 };
