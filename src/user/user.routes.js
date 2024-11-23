@@ -1,47 +1,51 @@
-const express = require('express');
+const express = require( 'express' );
 const { authenticateToken } = require('../utils/auth.middleware');
 const {
-    getUserProfile
-    , updateUserProfile
-    , deleteUserProfile
-    , getUserSessions
+    getMeProfile
+    , patchMeProfile
+    , deleteMeProfile
+    , getSessions
     , terminateSession
     , changePassword
-    , updateStatus
     , getStatus
-    , addFriend
-    , acceptFriend
-    , rejectFriend
-    , deleteFriend
-    , getFriends
-    , getFriendRequests
-} = require('./user.controller');
+    , updateStatus
+    , getUserProfile
+    , getUserStatus
+} = require( './user.controller' );
 
 // /user
 const router = express.Router();
 
-// Профиль пользователя
-router.get('/profile', authenticateToken, getUserProfile); // Получить информацию о пользователе
-router.put('/profile', authenticateToken, updateUserProfile); // Редактировать информацию о пользователе
-router.delete('/profile', authenticateToken, deleteUserProfile); // Удаление профиля пользователя
+// ------------------------------------------------------------------- //
+// Управление профилем
 
+router.get('/', authenticateToken, getMeProfile); // Получение информации о пользователе
+router.patch('/', authenticateToken, patchMeProfile); // Обновление профиля пользователя
+router.delete('/', authenticateToken, deleteMeProfile); // Удаление профиля пользователя
+
+// ------------------------------------------------------------------- //
 // Сессии пользователя
-router.get('/sessions', authenticateToken, getUserSessions); // Получить активные сессии
+
+router.get('/sessions', authenticateToken, getSessions); // Получить активные сессии
 router.delete('/sessions/:sessionId', authenticateToken, terminateSession); // Удаление сессии
 
+// ------------------------------------------------------------------- //
 // Безопасность
-router.post('/change-password', authenticateToken, changePassword); // Изменить пароль
 
-// Смена статуса
-router.get('/:id/status', authenticateToken, getStatus); // Получить статус пользователя
-router.put('/status', authenticateToken, updateStatus); // Обновить статус пользователя
+router.post('/password', authenticateToken, changePassword); // Обновить пароль пользователя
 
-// Друзья
-router.post('/friends/:friendId', authenticateToken, addFriend); // Отправить запрос дружбы
-router.put('/friends/:friendId/accept', authenticateToken, acceptFriend); // Принять запрос
-router.put('/friends/:friendId/reject', authenticateToken, rejectFriend); // Отклонить запрос
-router.get('/friends', authenticateToken, getFriends); // Получить список друзей
-router.delete('/friends/:friendId', authenticateToken, deleteFriend); // Удалить из друзей
-router.get('/friends/requests', authenticateToken, getFriendRequests); // Получение списка запросов
+// ------------------------------------------------------------------- //
+// Статусы
+
+router.get('/status', authenticateToken, getStatus); // Получить статус пользователя
+router.patch('/status', authenticateToken, updateStatus); // Обновить статус пользователя
+
+// ------------------------------------------------------------------- //
+// Другие пользователи
+
+router.get('/:userId/profile', authenticateToken, getUserProfile); // Получение информации о пользователе
+router.get('/:userId/status', authenticateToken, getUserStatus); // Получить статус пользователя
+
+// ------------------------------------------------------------------- //
 
 module.exports = router;

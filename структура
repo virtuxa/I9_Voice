@@ -1,0 +1,103 @@
+IVoice/
+├── server.js                # Точка входа
+├── .env                     # Конфигурация
+├── src/
+│   ├── auth/                # Модуль аутентификации
+│   │   ├── auth.controller.js
+│   │   ├── auth.routes.js
+│   │   ├── auth.service.js
+│   │   └── auth.validation.js
+│   ├── users/               # Модуль работы с пользователями
+│   │   ├── users.controller.js
+│   │   ├── users.routes.js
+│   │   ├── users.service.js
+│   │   └── users.repository.js
+│   ├── servers/             # Модуль серверов
+│   │   ├── servers.controller.js
+│   │   ├── servers.routes.js
+│   │   ├── servers.service.js
+│   │   ├── servers.repository.js
+│   │   └── servers.roles.js    # Работа с ролями и разрешениями
+│   ├── channels/            # Модуль каналов
+│   │   ├── channels.controller.js
+│   │   ├── channels.routes.js
+│   │   ├── channels.service.js
+│   │   ├── channels.repository.js
+│   │   └── channels.permissions.js
+│   ├── chats/               # Модуль чатов
+│   │   ├── chats.controller.js
+│   │   ├── chats.routes.js
+│   │   ├── chats.service.js
+│   │   ├── chats.repository.js
+│   │   └── chats.socket.js
+│   ├── sockets/             # WebSocket
+│   │   ├── socket.config.js
+│   │   ├── chat.socket.js
+│   │   ├── user.socket.js
+│   │   └── server.socket.js
+│   ├── middlewares/         # Промежуточные функции
+│   │   ├── auth.middleware.js
+│   │   ├── role.middleware.js
+│   │   └── error.middleware.js
+│   ├── models/              # Модели базы данных
+│   │   ├── User.js
+│   │   ├── Server.js
+│   │   ├── Role.js
+│   │   ├── Channel.js
+│   │   └── Message.js
+│   ├── utils/               # Утилиты
+│   │   ├── jwt.js
+│   │   ├── db.js
+│   │   ├── logger.js
+│   │   └── helpers.js
+│   └── config/              # Конфигурация
+│       ├── socket.config.js
+│       ├── db.config.js
+│       └── app.config.js
+├── package.json
+├── README.md
+└── logs/
+    ├── error.log
+    └── combined.log
+
+
+
+
+WebSocket (Socket.IO)
+2.1. Подключение
+connect: Устанавливает соединение с сервером (передаёт JWT токен).
+disconnect: Отключение клиента.
+2.2. Друзья
+События:
+friends:request: Отправка запроса на дружбу.
+friends:accept: Принятие запроса.
+friends:decline: Отклонение запроса.
+friends:remove: Удаление друга.
+friends:status: Уведомление о смене статуса (онлайн/офлайн).
+2.3. Серверы
+События:
+server:join: Присоединение к серверу.
+server:leave: Выход с сервера.
+server:update: Уведомление об изменении настроек сервера.
+server:delete: Уведомление об удалении сервера.
+server:member:add: Уведомление о новом участнике.
+server:member:remove: Уведомление об удалении участника.
+2.4. Каналы
+События:
+channel:create: Уведомление о создании канала.
+channel:update: Уведомление об изменении канала.
+channel:delete: Уведомление об удалении канала.
+channel:join: Присоединение к каналу (текстовому или голосовому).
+channel:leave: Выход из канала.
+2.5. Чаты
+Сообщения:
+chat:message: Отправка сообщения в канал.
+chat:message:edit: Редактирование сообщения.
+chat:message:delete: Удаление сообщения.
+chat:message:receive: Уведомление о новом сообщении.
+chat:typing:start: Уведомление о начале набора сообщения.
+chat:typing:stop: Уведомление о завершении набора сообщения.
+2.6. Уведомления
+События:
+notification: Отправка уведомлений (например, приглашение на сервер, запрос на дружбу).
+notification:read: Пометка уведомлений как прочитанных.

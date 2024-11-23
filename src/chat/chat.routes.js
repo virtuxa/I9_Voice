@@ -1,28 +1,45 @@
-const express = require('express');
+const express = require( 'express' );
 const { authenticateToken } = require('../utils/auth.middleware');
 const {
     createChat
-    , addMember
+    , chatList
+    , chatEdit
+    , deleteChat
+    , chatMembers
+    , addChatMember
+    , deleteChatMember
     , sendMessage
     , getMessages
-    , deleteChat
     , editMessage
     , deleteMessage
-} = require('./chat.controller');
+} = require( './chat.controller' );
 
+// /chat
 const router = express.Router();
 
-// Чаты
-router.post('/', authenticateToken, createChat); // Создать чат
-router.delete('/:chatId', authenticateToken, deleteChat); // Удалить чат
+// ------------------------------------------------------------------- //
+// Чат
 
+router.post('/', authenticateToken, createChat); // Создание чата
+router.get('/', authenticateToken, chatList); // Получение списка чатов
+router.patch('/:chatId', authenticateToken, chatEdit); // Изменение настроек чата
+router.delete('/:chatId', authenticateToken, deleteChat); // Удаление чата
+
+// ------------------------------------------------------------------- //
 // Участники
-router.post('/members', authenticateToken, addMember); // Добавить участника
 
+router.get('/:chatId/users', authenticateToken, chatMembers); // Получение списка участников чата
+router.post('/:chatId/users/:userId', authenticateToken, addChatMember); // Добавить пользователя в чат
+router.delete('/:chatId/users/:userId', authenticateToken, deleteChatMember); // Удалить пользователя из чата
+
+// ------------------------------------------------------------------- //
 // Сообщения
-router.post('/messages', authenticateToken, sendMessage); // Отправить сообщение
+
+router.post('/:chatId/messages', authenticateToken, sendMessage); // Отправить сообщение
 router.get('/:chatId/messages', authenticateToken, getMessages); // Получить сообщения
-router.put('/messages/:messageId', authenticateToken, editMessage); // Редактировать сообщение
-router.delete('/messages/:messageId', authenticateToken, deleteMessage); // Удалить сообщение
+router.put('/:chatId/messages/:messageId', authenticateToken, editMessage); // Редактировать сообщение
+router.delete('/:chatId/messages/:messageId', authenticateToken, deleteMessage); // Удалить сообщение
+
+// ------------------------------------------------------------------- //
 
 module.exports = router;
