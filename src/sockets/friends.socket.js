@@ -1,3 +1,4 @@
+// friends.socket.js
 const db = require('../database/db');
 
 module.exports = (io) => {
@@ -33,6 +34,39 @@ module.exports = (io) => {
                 socket.emit('error', { message: 'Ошибка получения списка друзей.' });
             }
         });
+
+        // Событие добавления в друзья
+        socket.on('friend:add', async (data) => {
+            try {
+                const { friendId } = data;
+        
+                // Вставляем запись в базу данных и получаем ID запроса
+                const insertResult = await db.query(`
+                    INSERT INTO friends (user_id, friend_id, status)
+                    VALUES ($1, $2, 'pending') RETURNING id
+                `, [userId, friendId]);
+        
+                const requestId = insertResult.rows[0]?.id; // Получаем ID запроса
+                if (!requestId) {
+                    console.error('Failed to insert friend request into database');
+                    return;
+                }
+        
+                // Отправляем событие с requestId
+                const friendRoom = `user:${friendId}`;
+                io.to(friendRoom).emit('friend:update', {
+                    type: 'friend_request',
+                    requestId, // Добавляем requestId
+                    userId,
+                    message: `User ${userId} отправил вам запрос в друзья.`,
+                });
+        
+                console.log(`Friend request sent: Request ID = ${requestId}, From = ${userId}, To = ${friendId}`);
+            } catch (error) {
+                console.error('Error in friend:add:', error.message);
+                socket.emit('error', { message: 'Failed to add friend request' });
+            }
+        });        
 
         // Уведомить друзей при обновлении
         socket.on('friend:update', async (data) => {

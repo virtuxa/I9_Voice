@@ -45,6 +45,13 @@ const register = async (req, res) => {
             [refreshToken, user.id]
         );
 
+        // Добавляем начальный статус пользователя
+        await db.query(
+            `INSERT INTO user_statuses (user_id, status, text_status, description) 
+             VALUES ($1, $2, $3, $4)`,
+            [user.id, 'offline', 'Offline', 'User has not set a status yet']
+        );
+
         // Возвращаем ответ клиенту
         res.status(201).json({
             message: 'Пользователь успешно зарегистрирован',

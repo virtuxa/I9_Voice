@@ -71,22 +71,15 @@ const addFriend = async (req, res) => {
             VALUES ($1, $2, 'pending')
         `, [userId, friendId]);
 
-        // Отправка уведомления (если WebSocket доступен)
-        const notification = {
-            userId: friendId, // Кому отправляется уведомление
-            type: 'friend_request', // Тип уведомления
-            message: `User ${userId} has sent you a friend request.`,
-        };
-
+        // Уведомляем через WebSocket
         if (req.io) {
-            req.io.to(`user:${friendId}`).emit('notification:new', notification);
+            const friendRoom = `user:${friendId}`;
+            req.io.to(friendRoom).emit('friend:update', {
+                type: 'friend_request',
+                userId: userId,
+                message: `User ${userId} отправил вам запрос в друзья.`,
+            });
         }
-
-        // Записываем уведомление в базу данных
-        await db.query(`
-            INSERT INTO notifications (user_id, type, message) 
-            VALUES ($1, $2, $3)
-        `, [friendId, notification.type, notification.message]);
 
         res.status(201).json({ message: 'Friend request sent successfully' });
     } catch (error) {
