@@ -11,6 +11,7 @@ const scheduleSessionCleanup = require('./src/utils/cleanup');
 const authRoutes = require('./src/auth/auth.routes');
 const notificationsRoutes = require('./src/notifications/notifications.routes');
 const userRoutes = require('./src/user/user.routes');
+const friendsRoutes = require('./src/friends/friends.routes');
 const serversRoutes = require('./src/server/server.routes');
 
 // Инициализируем переменные
@@ -22,11 +23,18 @@ const SV_HOST = process.env.SV_HOST;
 const SV_PORT = process.env.SV_PORT;
 
 // Настройка CORS
-app.use(cors({
-    origin: '*', // TODO: Понять что это
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+const corsOptions = {
+    origin: '*', // Разрешает запросы с любого источника
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Добавьте все используемые методы
+    allowedHeaders: ['Content-Type', 'Authorization'], // Разрешённые заголовки
+};
+app.use(cors(corsOptions));
+
+// Middleware для передачи io в запрос
+app.use((req, res, next) => {
+    req.io = io; // Добавляем io в объект запроса
+    next();
+});
 
 // Глобальные middlewares
 app.use( express.json() );
@@ -35,6 +43,7 @@ app.use( express.json() );
 app.use('/auth', authRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/user', userRoutes);
+app.use('/friends', friendsRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {

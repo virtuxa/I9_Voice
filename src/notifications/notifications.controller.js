@@ -7,7 +7,7 @@ const createNotification = async (req, res) => {
 
         // Проверка обязательных полей
         if (!userId || !type || !message) {
-            return res.status(400).json({ error: 'Missing required fields: userId, type, or message' });
+            return res.status(400).json({ error: 'Не хватает полей: userId, тип, или сообщение' });
         }
 
         // Проверяем, существует ли пользователь
@@ -17,7 +17,7 @@ const createNotification = async (req, res) => {
         );
 
         if (userCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Пользователь не найден' });
         }
 
         // Добавляем уведомление
@@ -29,13 +29,18 @@ const createNotification = async (req, res) => {
 
         const notification = result.rows[0];
 
+        // Отправляем уведомление через Socket.IO
+        if (req.io) {
+            req.io.to(`user:${userId}`).emit('notification:new', notification);
+        }
+
         res.status(201).json({
-            message: 'Notification created successfully',
+            message: 'Уведомление успешно создано',
             notification,
         });
     } catch (error) {
-        console.error('Error creating notification:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Ошибка создания уведомления:', error.message);
+        res.status(500).json({ error: 'Ошибка сервера' });
     }
 };
 

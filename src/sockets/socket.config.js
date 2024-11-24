@@ -26,7 +26,23 @@ const configureSocketIO = (server) => {
         }
     });
 
-    // Подключаем обработчики
+    // Обработчик подключения
+    io.on('connection', (socket) => {
+        const userId = socket.user.userId;
+
+        console.log(`Пользователь подключён: ${userId}`);
+
+        // Подписываем пользователя на его персональную комнату
+        socket.join(`user:${userId}`);
+        console.log(`Пользователь ${userId} подписан на комнату user:${userId}`);
+
+        // Обработчик отключения
+        socket.on('disconnect', () => {
+            console.log(`Пользователь отключён: ${userId}`);
+        });
+    });
+
+    // Подключаем другие обработчики
     notificationsSocket(io);
 
     return io;

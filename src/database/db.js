@@ -69,6 +69,17 @@ const initDatabase = async () => {
             );
         `);
 
+        // Создание таблицы friends, если она не существует
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS friends (
+                id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                friend_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'accepted', 'declined')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         console.log('База данных инциализирована.');
     } catch (error) {
         console.error('Ошибка инициализации базы данных:', error.message);
