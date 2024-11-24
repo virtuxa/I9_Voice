@@ -40,7 +40,7 @@ const addFriend = async (req, res) => {
         const { friendId } = req.body;
 
         if (!friendId) {
-            return res.status(400).json({ error: 'Friend ID is required' });
+            return res.status(400).json({ error: 'Требуется ID друга' });
         }
 
         // Проверка: пользователь не может добавить сам себя
@@ -51,7 +51,7 @@ const addFriend = async (req, res) => {
         // Проверяем, существует ли пользователь
         const userCheck = await db.query(`SELECT id FROM users WHERE id = $1`, [friendId]);
         if (userCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Пользователь не найден' });
         }
 
         // Проверяем, не существует ли уже такой запрос
@@ -62,7 +62,7 @@ const addFriend = async (req, res) => {
         `, [userId, friendId]);
 
         if (existingRequest.rows.length > 0) {
-            return res.status(400).json({ error: 'Friend request already exists or user is already a friend' });
+            return res.status(400).json({ error: 'Запрос существует или пользователи уже являются друзьями' });
         }
 
         // Создаём запрос на дружбу
@@ -90,7 +90,7 @@ const addFriend = async (req, res) => {
 
         res.status(201).json({ message: 'Friend request sent successfully' });
     } catch (error) {
-        console.error('Error sending friend request:', error.message);
+        console.error('Ошибка отправки запроса дружбы:', error.message);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -124,6 +124,22 @@ const ansRequest = async (req, res) => {
             WHERE id = $2
         `, [newStatus, requestId]);
 
+        // Уведомление через Socket.IO
+        if (req.io && action === 'accept') {
+            const senderId = request.rows[0].user_id;
+            const recipientRoom = `user:${senderId}`;
+
+            req.io.to(recipientRoom).emit('friend:update', {
+                type: 'friend_request_response',
+                message: `User ${userId} accepted your friend request.`,
+            });
+
+            req.io.to(`user:${userId}`).emit('friend:update', {
+                type: 'friend_request_response',
+                message: `Friend request from user ${senderId} has been accepted.`,
+            });
+        }
+
         res.json({ message: `Friend request ${newStatus}` });
     } catch (error) {
         console.error('Error responding to friend request:', error.message);
@@ -143,6 +159,20 @@ const deleteFriend = async (req, res) => {
             WHERE (user_id = $1 AND friend_id = $2) 
                OR (user_id = $2 AND friend_id = $1)
         `, [userId, friendId]);
+
+        // Уведомляем через WebSocket
+        if (req.io) {
+            const friendRoom = `user:${friendId}`;
+            req.io.to(friendRoom).emit('friend:update', {
+                type: 'friend_remove',
+                message: `User ${userId} removed you as a friend.`,
+            });
+
+            req.io.to(`user:${userId}`).emit('friend:update', {
+                type: 'friend_remove',
+                message: `You removed user ${friendId} as a friend.`,
+            });
+        }
 
         res.json({ message: 'Friend removed successfully' });
     } catch (error) {
