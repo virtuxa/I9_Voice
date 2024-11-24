@@ -1,5 +1,5 @@
 const express = require( 'express' );
-const { authenticateToken } = require('../utils/auth.middleware');
+const { validateRegister } = require('./auth.validation');
 const {
     register
     , login
@@ -13,10 +13,10 @@ const router = express.Router();
 // ------------------------------------------------------------------- //
 // Аутентификация
 
-router.post( '/register', register ); // Регистрация пользователя
+router.post( '/register', validateRegister, register ); // Регистрация пользователя
 router.post( '/login', login ); // Авторизация пользователя
-router.post( '/refresh', refreshToken ); // Обновление токенов
 router.post( '/logout', logout ); // Выход из профиля
+router.post( '/refresh', refreshToken ); // Обновление токенов
 
 // ------------------------------------------------------------------- //
 

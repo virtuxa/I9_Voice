@@ -1,11 +1,12 @@
 const express = require( 'express' );
-const { authenticateToken } = require('../utils/auth.middleware');
+const { authenticateToken } = require('../middlewares/auth.middleware');
 const {
     getMeProfile
     , patchMeProfile
     , deleteMeProfile
     , getSessions
     , terminateSession
+    , terminateAllSession
     , changePassword
     , getStatus
     , updateStatus
@@ -28,6 +29,7 @@ router.delete('/', authenticateToken, deleteMeProfile); // Удаление пр
 
 router.get('/sessions', authenticateToken, getSessions); // Получить активные сессии
 router.delete('/sessions/:sessionId', authenticateToken, terminateSession); // Удаление сессии
+router.delete('/sessions', authenticateToken, terminateAllSession); // Удаление всех сессий
 
 // ------------------------------------------------------------------- //
 // Безопасность
