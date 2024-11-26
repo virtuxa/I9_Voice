@@ -13,7 +13,7 @@ const router = express.Router();
 // ------------------------------------------------------------------- //
 // Аутентификация
 
-router.post( '/register', validateRegister, register ); // Регистрация пользователя
+router.post( '/register', register ); // Регистрация пользователя
 router.post( '/login', login ); // Авторизация пользователя
 router.post( '/logout', logout ); // Выход из профиля
 router.post( '/refresh', refreshToken ); // Обновление токенов

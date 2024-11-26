@@ -8,11 +8,10 @@ const cors = require('cors');
 // Подключение модулей
 const { initDatabase } = require('./src/database/db'); // Подключаем базу данных
 const scheduleSessionCleanup = require('./src/utils/cleanup');
+// Подключение маршрутов
 const authRoutes = require('./src/auth/auth.routes');
-const notificationsRoutes = require('./src/notifications/notifications.routes');
-const userRoutes = require('./src/user/user.routes');
+const usersRoutes = require('./src/users/users.routes');
 const friendsRoutes = require('./src/friends/friends.routes');
-const serversRoutes = require('./src/server/server.routes');
 
 // Инициализируем переменные
 const app = express();
@@ -41,8 +40,7 @@ app.use( express.json() );
 
 // Маршруты
 app.use('/auth', authRoutes);
-app.use('/notifications', notificationsRoutes);
-app.use('/user', userRoutes);
+app.use('/users', usersRoutes);
 app.use('/friends', friendsRoutes);
 
 // Health Check

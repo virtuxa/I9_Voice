@@ -1,67 +1,62 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
 const db = require('../database/db');
 
 // Регистрация пользователя
 const register = async (req, res) => {
     try {
-        const { username, display_name, email, password, birth_date } = req.body;
+        const { user_name, display_name, email, password, birth_date, phone_number } = req.body;
 
-        // Проверка на заполненность полей
-        if (!username || !display_name || !email || !password || !birth_date) {
-            return res.status(400).json({ error: 'Заполнены не все поля' });
+        // Проверяем, что все обязательные поля заполнены
+        if (!user_name || !display_name || !email || !password || !birth_date) {
+            return res.status(400).json({ error: 'Все поля обязательны для заполнения' });
         }
 
-        // Проверка уникальности email и имени пользователя
+        // Проверяем уникальность имени пользователя, email и номера телефона (если указан)
         const userExists = await db.query(
-            `SELECT id FROM users WHERE email = $1 OR username = $2`,
-            [email, username]
+            `SELECT user_id FROM users WHERE user_name = $1 OR email = $2 OR phone_number = $3`,
+            [user_name, email, phone_number]
         );
         if (userExists.rows.length > 0) {
-            return res.status(400).json({ error: 'Пользователь с такой почтой или именем пользователя зарегистрирован' });
+            return res.status(400).json({ error: 'Имя пользователя, email или номер телефона уже заняты' });
         }
 
-        // Хэширование пароля
+        // Хэшируем пароль
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Сохранение пользователя в базе данных
+        // Сохраняем пользователя в базу данных
         const result = await db.query(
-            `INSERT INTO users (username, display_name, email, password, birth_date) 
-             VALUES ($1, $2, $3, $4, $5) 
-             RETURNING id, username, display_name, email, birth_date`,
-            [username, display_name, email, hashedPassword, birth_date]
+            `INSERT INTO users (user_name, display_name, email, password, birth_date, phone_number) 
+             VALUES ($1, $2, $3, $4, $5, $6) 
+             RETURNING user_id, user_name, display_name, email, birth_date, phone_number`,
+            [user_name, display_name, email, hashedPassword, birth_date, phone_number]
         );
-
         const user = result.rows[0];
 
-        // Генерация токенов
-        const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '15m' });
-        const refreshToken = jwt.sign({ userId: user.id }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
-
-        // Сохраняем refreshToken в таблице refresh_tokens
+        // Создаем запись в user_profiles
         await db.query(
-            `INSERT INTO refresh_tokens (refresh_token, user_id) VALUES ($1, $2)`,
-            [refreshToken, user.id]
+            `INSERT INTO user_profiles (user_id, status, description) 
+             VALUES ($1, $2, $3)`,
+            [user.user_id, 'offline', 'New user']
         );
 
-        // Добавляем начальный статус пользователя
+        // Генерируем токены
+        const accessToken = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+        const refreshToken = jwt.sign({ userId: user.user_id }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
+
+        // Вставляем или обновляем refreshToken в базе данных
         await db.query(
-            `INSERT INTO user_statuses (user_id, status, text_status, description) 
-             VALUES ($1, $2, $3, $4)`,
-            [user.id, 'offline', 'Offline', 'User has not set a status yet']
+            `INSERT INTO refresh_tokens (refresh_token, user_id) 
+             VALUES ($1, $2) 
+             ON CONFLICT (user_id) 
+             DO UPDATE SET refresh_token = $1, created_at = NOW()`,
+            [refreshToken, user.user_id]
         );
 
-        // Возвращаем ответ клиенту
+        // Возвращаем успешный ответ
         res.status(201).json({
-            message: 'Пользователь успешно зарегистрирован',
-            user: {
-                id: user.id,
-                username: user.username,
-                display_name: user.display_name,
-                email: user.email,
-                birth_date: user.birth_date,
-            },
+            message: 'Регистрация прошла успешно',
+            user,
             tokens: {
                 accessToken,
                 refreshToken,
@@ -73,21 +68,21 @@ const register = async (req, res) => {
     }
 };
 
-// Функция авторизации
+// Авторизация пользователя
 const login = async (req, res) => {
     try {
         const { login, password } = req.body;
 
         // Проверяем, что все поля заполнены
         if (!login || !password) {
-            return res.status(400).json({ error: 'Требуются логин и пароль' });
+            return res.status(400).json({ error: 'Логин и пароль обязательны' });
         }
 
-        // Ищем пользователя по email или username
+        // Ищем пользователя по имени пользователя, email или номеру телефона
         const result = await db.query(
-            `SELECT id, username, display_name, email, password, birth_date 
+            `SELECT user_id, user_name, display_name, email, phone_number, password 
              FROM users 
-             WHERE email = $1 OR username = $1`,
+             WHERE user_name = $1 OR email = $1 OR phone_number = $1`,
             [login]
         );
         const user = result.rows[0];
@@ -97,51 +92,33 @@ const login = async (req, res) => {
         }
 
         // Сравниваем пароль
-        const isPasswordMatch = await bcrypt.compare(password, user.password);
-        if (!isPasswordMatch) {
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
             return res.status(401).json({ error: 'Неверный логин или пароль' });
         }
 
         // Генерируем токены
-        const accessToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '15m' });
-        const refreshToken = jwt.sign({ userId: user.id }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
+        const accessToken = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+        const refreshToken = jwt.sign({ userId: user.user_id }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
 
-        // Проверяем, есть ли уже refreshToken в таблице
-        const tokenExists = await db.query(
-            `SELECT refresh_token FROM refresh_tokens WHERE user_id = $1`,
-            [user.id]
-        );
-
-        if (tokenExists.rows.length > 0) {
-            // Обновляем существующий refreshToken
-            await db.query(
-                `UPDATE refresh_tokens SET refresh_token = $1, created_at = NOW() WHERE user_id = $2`,
-                [refreshToken, user.id]
-            );
-        } else {
-            // Вставляем новый refreshToken
-            await db.query(
-                `INSERT INTO refresh_tokens (refresh_token, user_id) VALUES ($1, $2)`,
-                [refreshToken, user.id]
-            );
-        };
-
-        // Сохранение сессии
-        const deviceInfo = req.headers['user-agent'] || 'Unknown Device';
+        // Вставляем или обновляем refreshToken в базе данных
         await db.query(
-            `INSERT INTO sessions (user_id, refresh_token, device_info) VALUES ($1, $2, $3)`,
-            [user.id, refreshToken, deviceInfo]
+            `INSERT INTO refresh_tokens (refresh_token, user_id) 
+             VALUES ($1, $2) 
+             ON CONFLICT (user_id) 
+             DO UPDATE SET refresh_token = $1, created_at = NOW()`,
+            [refreshToken, user.user_id]
         );
 
-        // Возвращаем токены и данные пользователя
+        // Возвращаем успешный ответ
         res.json({
             message: 'Авторизация прошла успешно',
             user: {
-                id: user.id,
-                username: user.username,
+                user_id: user.user_id,
+                user_name: user.user_name,
                 display_name: user.display_name,
                 email: user.email,
-                birth_date: user.birth_date,
+                phone_number: user.phone_number,
             },
             tokens: {
                 accessToken,
@@ -149,87 +126,69 @@ const login = async (req, res) => {
             },
         });
     } catch (error) {
-        console.error('Error during login:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Ошибка при авторизации:', error.message);
+        res.status(500).json({ error: 'Ошибка сервера' });
     }
 };
 
-// Функция выхода из профиля
+// Выход из профиля
 const logout = async (req, res) => {
     try {
         const { refreshToken } = req.body;
 
         // Проверяем, что refreshToken передан
         if (!refreshToken) {
-            return res.status(400).json({ error: 'Требуется Refresh token' });
+            return res.status(400).json({ error: 'Refresh token обязателен' });
         }
 
-        // Проверяем наличие токена в базе
+        // Проверяем, существует ли токен
         const tokenExists = await db.query(
             `SELECT refresh_token FROM refresh_tokens WHERE refresh_token = $1`,
             [refreshToken]
         );
 
         if (tokenExists.rows.length === 0) {
-            return res.status(404).json({ error: 'Refresh token не найден' });
+            return res.status(404).json({ error: 'Токен не найден' });
         }
 
-        // Удаляем refreshToken из базы
+        // Удаляем токен
         await db.query(
             `DELETE FROM refresh_tokens WHERE refresh_token = $1`,
             [refreshToken]
         );
 
-        res.json({ message: 'Успешный выход' });
+        res.json({ message: 'Вы успешно вышли из профиля' });
     } catch (error) {
-        console.error('Ошибка при logout:', error.message);
+        console.error('Ошибка при выходе из профиля:', error.message);
         res.status(500).json({ error: 'Ошибка сервера' });
     }
 };
 
-// Функция обновления refresh токена
+// Обновление токенов
 const refreshToken = async (req, res) => {
     try {
         const { refreshToken } = req.body;
 
         // Проверяем, что refreshToken передан
         if (!refreshToken) {
-            return res.status(400).json({ error: 'Требуется токен' });
-        }
-
-        // Проверяем, что токен есть в базе данных
-        const tokenExists = await db.query(
-            `SELECT user_id FROM refresh_tokens WHERE refresh_token = $1`,
-            [refreshToken]
-        );
-
-        if (tokenExists.rows.length === 0) {
-            return res.status(403).json({ error: 'Токен не найден' });
+            return res.status(400).json({ error: 'Refresh token обязателен' });
         }
 
         // Проверяем валидность токена
-        let payload;
-        try {
-            payload = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
-        } catch (err) {
-            return res.status(403).json({ error: 'Неверный токен' });
-        }
-
-        const userId = payload.userId;
+        const payload = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
 
         // Генерируем новые токены
-        const newAccessToken = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
-        const newRefreshToken = jwt.sign({ userId }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
+        const newAccessToken = jwt.sign({ userId: payload.userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
+        const newRefreshToken = jwt.sign({ userId: payload.userId }, process.env.REFRESH_SECRET, { expiresIn: '7d' });
 
-        // Обновляем refreshToken в базе
+        // Обновляем refreshToken в базе данных
         await db.query(
-            `UPDATE refresh_tokens SET refresh_token = $1, created_at = NOW() WHERE user_id = $2`,
-            [newRefreshToken, userId]
+            `UPDATE refresh_tokens SET refresh_token = $1 WHERE user_id = $2`,
+            [newRefreshToken, payload.userId]
         );
 
-        // Возвращаем новые токены клиенту
         res.json({
-            message: 'Токены обновлены успешно',
+            message: 'Токены успешно обновлены',
             tokens: {
                 accessToken: newAccessToken,
                 refreshToken: newRefreshToken,
@@ -241,9 +200,9 @@ const refreshToken = async (req, res) => {
     }
 };
 
-module.exports = { 
-    register
-    , login
-    , logout
-    , refreshToken
-}
+module.exports = {
+    register,
+    login,
+    logout,
+    refreshToken,
+};
