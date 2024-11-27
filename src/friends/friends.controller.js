@@ -38,6 +38,7 @@ const addFriend = async (req, res) => {
     try {
         const userId = req.user.userId;
         const { friendId } = req.body;
+        const io = req.io; // Получаем экземпляр io из запроса
 
         if (!friendId) {
             return res.status(400).json({ error: 'Требуется ID друга' });
@@ -71,6 +72,12 @@ const addFriend = async (req, res) => {
             VALUES ($1, $2, 'pending')
         `, [userId, friendId]);
 
+        // Уведомление пользователя о новом запросе
+        io.to(`user:${friendId}`).emit('friends:newRequest', {
+            from: userId,
+            message: 'Новый запрос в друзья',
+        });
+
         res.status(201).json({ message: 'Friend request sent successfully' });
     } catch (error) {
         console.error('Ошибка отправки запроса дружбы:', error.message);
@@ -83,7 +90,8 @@ const ansRequest = async (req, res) => {
     try {
         const userId = req.user.userId;
         const { friendshipId } = req.params;
-        const { action } = req.body; // action: "accept" or "decline"
+        const { action } = req.body;
+        const io = req.io; // Получаем экземпляр io из запроса
 
         if (!action || !['accept', 'decline'].includes(action)) {
             return res.status(400).json({ error: 'Invalid action. Use "accept" or "decline"' });
@@ -107,6 +115,28 @@ const ansRequest = async (req, res) => {
             WHERE friendship_id = $2
         `, [newStatus, friendshipId]);
 
+        const { user_first } = request.rows[0];
+
+        // Получаем информацию о пользователе
+        const userInfo = await db.query(`
+            SELECT user_name, display_name 
+            FROM users 
+            WHERE user_id = $1
+        `, [userId]);
+
+        if (userInfo.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const { user_name, display_name } = userInfo.rows[0];
+
+        // Уведомление об ответе
+        io.to(`user:${user_first}`).emit('friends:requestResponded', {
+            friendshipId,
+            status: newStatus,
+            user: { user_id: userId, user_name, display_name }, // Добавляем информацию о пользователе
+            });
+
         res.json({ message: `Friend request ${newStatus}` });
     } catch (error) {
         console.error('Error responding to friend request:', error.message);
@@ -119,6 +149,7 @@ const deleteFriend = async (req, res) => {
     try {
         const userId = req.user.userId;
         const { friendId } = req.params;
+        const io = req.io; // Получаем экземпляр io из запроса
 
         // Удаляем запись о дружбе
         await db.query(`
@@ -126,6 +157,12 @@ const deleteFriend = async (req, res) => {
             WHERE (user_first = $1 AND user_second = $2) 
                OR (user_first = $2 AND user_second = $1)
         `, [userId, friendId]);
+
+        // Уведомление об удалении
+        io.to(`user:${friendId}`).emit('friends:removed', {
+            by: userId,
+            message: 'Вы были удалены из друзей',
+        });
 
         res.json({ message: 'Friend removed successfully' });
     } catch (error) {

@@ -96,9 +96,19 @@ const configureFriendsSocket = (io) => {
                     WHERE friendship_id = $2
                 `, [newStatus, friendshipId]);
 
+                const { user_first } = request.rows[0];
+
                 // Уведомляем инициатора запроса
-                const initiatorId = request.rows[0].user_first;
-                io.to(`user:${initiatorId}`).emit('friends:requestResponded', { friendshipId, status: newStatus });
+                io.to(`user:${user_first}`).emit('friends:requestResponded', {
+                    friendshipId,
+                    status: newStatus,
+                });
+
+                // Уведомляем принимающего
+                io.to(`user:${userId}`).emit('friends:statusUpdated', {
+                    friendshipId,
+                    status: newStatus,
+                });
 
                 callback({ success: true, message: `Friend request ${newStatus}` });
             } catch (error) {
