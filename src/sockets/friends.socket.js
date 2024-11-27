@@ -1,106 +1,157 @@
-// friends.socket.js
 const db = require('../database/db');
 
-module.exports = (io) => {
+const configureFriendsSocket = (io) => {
     io.on('connection', (socket) => {
         const userId = socket.user.userId;
 
-        console.log(`friends.socket: Пользователь ${userId} подключился`);
+        console.log(`socket.friend connected: ${userId}`);
 
-        // Отправить список друзей
-        socket.on('friend:getList', async () => {
+        // Запрос списка друзей
+        socket.on('friends:getList', async (_, callback) => {
             try {
-                const friends = await db.query(`
+                const result = await db.query(`
                     SELECT 
                         CASE 
-                            WHEN f.user_id = $1 THEN f.friend_id 
-                            ELSE f.user_id 
-                        END AS id, 
-                        u.username, 
-                        u.display_name,
-                        f.status
+                            WHEN f.user_first = $1 THEN f.user_second 
+                            ELSE f.user_first 
+                        END AS friend_id, 
+                        u.user_name, 
+                        u.display_name, 
+                        f.status 
                     FROM friends f
                     JOIN users u 
-                        ON u.id = CASE 
-                                    WHEN f.user_id = $1 THEN f.friend_id 
-                                    ELSE f.user_id 
-                                  END
-                    WHERE (f.user_id = $1 OR f.friend_id = $1)
+                        ON u.user_id = CASE 
+                                        WHEN f.user_first = $1 THEN f.user_second 
+                                        ELSE f.user_first 
+                                      END
+                    WHERE f.user_first = $1 OR f.user_second = $1
                 `, [userId]);
 
-                socket.emit('friend:list', friends.rows);
+                callback({ success: true, friends: result.rows });
             } catch (error) {
-                console.error('Ошибка получения списка друзей:', error.message);
-                socket.emit('error', { message: 'Ошибка получения списка друзей.' });
+                console.error('Error fetching friend list:', error.message);
+                callback({ success: false, error: 'Error fetching friend list' });
             }
         });
 
-        // Событие добавления в друзья
-        socket.on('friend:add', async (data) => {
+        // Отправка запроса на добавление друга
+        socket.on('friends:add', async ({ friendId }, callback) => {
             try {
-                const { friendId } = data;
-        
-                // Вставляем запись в базу данных и получаем ID запроса
-                const insertResult = await db.query(`
-                    INSERT INTO friends (user_id, friend_id, status)
-                    VALUES ($1, $2, 'pending') RETURNING id
-                `, [userId, friendId]);
-        
-                const requestId = insertResult.rows[0]?.id; // Получаем ID запроса
-                if (!requestId) {
-                    console.error('Failed to insert friend request into database');
-                    return;
+                if (!friendId) return callback({ success: false, error: 'Friend ID is required' });
+
+                if (userId === friendId) {
+                    return callback({ success: false, error: 'Cannot add yourself as a friend' });
                 }
-        
-                // Отправляем событие с requestId
-                const friendRoom = `user:${friendId}`;
-                io.to(friendRoom).emit('friend:update', {
-                    type: 'friend_request',
-                    requestId, // Добавляем requestId
-                    userId,
-                    message: `User ${userId} отправил вам запрос в друзья.`,
-                });
-        
-                console.log(`Friend request sent: Request ID = ${requestId}, From = ${userId}, To = ${friendId}`);
+
+                const userCheck = await db.query(`SELECT user_id FROM users WHERE user_id = $1`, [friendId]);
+                if (userCheck.rows.length === 0) {
+                    return callback({ success: false, error: 'User not found' });
+                }
+
+                const existingRequest = await db.query(`
+                    SELECT * FROM friends 
+                    WHERE (user_first = $1 AND user_second = $2) 
+                       OR (user_first = $2 AND user_second = $1)
+                `, [userId, friendId]);
+
+                if (existingRequest.rows.length > 0) {
+                    return callback({ success: false, error: 'Friend request already exists or users are already friends' });
+                }
+
+                await db.query(`
+                    INSERT INTO friends (user_first, user_second, status) 
+                    VALUES ($1, $2, 'pending')
+                `, [userId, friendId]);
+
+                // Уведомляем пользователя о новом запросе
+                io.to(`user:${friendId}`).emit('friends:newRequest', { from: userId });
+
+                callback({ success: true, message: 'Friend request sent successfully' });
             } catch (error) {
-                console.error('Error in friend:add:', error.message);
-                socket.emit('error', { message: 'Failed to add friend request' });
+                console.error('Error adding friend:', error.message);
+                callback({ success: false, error: 'Error adding friend' });
             }
-        });        
+        });
 
-        // Уведомить друзей при обновлении
-        socket.on('friend:update', async (data) => {
+        // Ответ на запрос дружбы
+        socket.on('friends:respondRequest', async ({ friendshipId, action }, callback) => {
             try {
-                const { friendId, action } = data;
-                const friendRoom = `user:${friendId}`;
+                if (!action || !['accept', 'decline'].includes(action)) {
+                    return callback({ success: false, error: 'Invalid action. Use "accept" or "decline"' });
+                }
 
-                if (action === 'add') {
-                    io.to(friendRoom).emit('friend:update', {
-                        type: 'friend_add',
-                        userId: userId, // Передаём userId
-                            message: `User ${userId} добавил вас в друзья.`,
-                    });
-                } else if (action === 'remove') {
-                    io.to(friendRoom).emit('friend:update', {
-                        type: 'friend_remove',
-                        userId: userId, // Передаём userId
-                        message: `User ${userId} removed you as a friend.`,
-                    });
+                const request = await db.query(`
+                    SELECT * FROM friends 
+                    WHERE friendship_id = $1 AND user_second = $2 AND status = 'pending'
+                `, [friendshipId, userId]);
 
-                    socket.emit('friend:update', {
-                        type: 'friend_remove',
-                        userId: friendId, // Передаём friendId
-                        message: `You removed user ${friendId} as a friend.`,
-                        });
-                    } else {
-                        throw new Error('Неизвестное действие');
-                    }
+                if (request.rows.length === 0) {
+                    return callback({ success: false, error: 'Friend request not found' });
+                }
 
-                    console.log(`Уведомление отправлено в комнату ${friendRoom}: ${action}`);
+                const newStatus = action === 'accept' ? 'accepted' : 'declined';
+                await db.query(`
+                    UPDATE friends 
+                    SET status = $1 
+                    WHERE friendship_id = $2
+                `, [newStatus, friendshipId]);
+
+                // Уведомляем инициатора запроса
+                const initiatorId = request.rows[0].user_first;
+                io.to(`user:${initiatorId}`).emit('friends:requestResponded', { friendshipId, status: newStatus });
+
+                callback({ success: true, message: `Friend request ${newStatus}` });
             } catch (error) {
-                console.error('Ошибка в friend:update:', error.message);
-                socket.emit('error', { message: 'Ошибка обработки обновления друзей.' });
+                console.error('Error responding to friend request:', error.message);
+                callback({ success: false, error: 'Error responding to friend request' });
+            }
+        });
+
+        // Удаление друга
+        socket.on('friends:remove', async ({ friendId }, callback) => {
+            try {
+                await db.query(`
+                    DELETE FROM friends 
+                    WHERE (user_first = $1 AND user_second = $2) 
+                       OR (user_first = $2 AND user_second = $1)
+                `, [userId, friendId]);
+
+                io.to(`user:${friendId}`).emit('friends:removed', { by: userId });
+
+                callback({ success: true, message: 'Friend removed successfully' });
+            } catch (error) {
+                console.error('Error removing friend:', error.message);
+                callback({ success: false, error: 'Error removing friend' });
+            }
+        });
+
+        // Получение списка друзей другого пользователя
+        socket.on('friends:getUserList', async ({ targetUserId }, callback) => {
+            try {
+                const result = await db.query(`
+                    SELECT 
+                        CASE 
+                            WHEN f.user_first = $1 THEN f.user_second 
+                            ELSE f.user_first 
+                        END AS friend_id, 
+                        u.user_name, 
+                        u.display_name 
+                    FROM friends f
+                    JOIN users u 
+                        ON u.user_id = CASE 
+                                        WHEN f.user_first = $1 THEN f.user_second 
+                                        ELSE f.user_first 
+                                      END
+                    WHERE (f.user_first = $1 OR f.user_second = $1) AND f.status = 'accepted'
+                `, [targetUserId]);
+
+                callback({ success: true, friends: result.rows });
+            } catch (error) {
+                console.error('Error fetching user friend list:', error.message);
+                callback({ success: false, error: 'Error fetching user friend list' });
             }
         });
     });
 };
+
+module.exports = configureFriendsSocket;

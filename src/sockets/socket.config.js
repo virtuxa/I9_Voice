@@ -1,6 +1,5 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
-const notificationsSocket = require('./notifications.socket');
 const friendsSocket = require('./friends.socket');
 
 const configureSocketIO = (server) => {
@@ -43,8 +42,7 @@ const configureSocketIO = (server) => {
         });
     });
 
-    notificationsSocket(io); // Подключаем уведомления
-    friendsSocket(io);       // Подключаем обработчики для друзей
+    friendsSocket(io)// Подключаем обработчики для друзей
 
     return io;
 };

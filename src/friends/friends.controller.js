@@ -8,19 +8,19 @@ const myFriendList = async (req, res) => {
         const result = await db.query(`
             SELECT 
                 CASE 
-                    WHEN f.user_id = $1 THEN f.friend_id 
-                    ELSE f.user_id 
-                END AS id, 
-                u.username, 
+                    WHEN f.user_first = $1 THEN f.user_second 
+                    ELSE f.user_first 
+                END AS friend_id, 
+                u.user_name, 
                 u.display_name, 
                 f.status 
             FROM friends f
             JOIN users u 
-                ON u.id = CASE 
-                            WHEN f.user_id = $1 THEN f.friend_id 
-                            ELSE f.user_id 
+                ON u.user_id = CASE 
+                                WHEN f.user_first = $1 THEN f.user_second 
+                                ELSE f.user_first 
                           END
-            WHERE f.user_id = $1 OR f.friend_id = $1
+            WHERE f.user_first = $1 OR f.user_second = $1
         `, [userId]);
 
         res.json({
@@ -48,8 +48,8 @@ const addFriend = async (req, res) => {
             return res.status(400).json({ error: 'Пользователь не может добавить в друзья сам себя' });
         }
 
-        // Проверяем, существует ли пользователь
-        const userCheck = await db.query(`SELECT id FROM users WHERE id = $1`, [friendId]);
+        // Проверяем, существует ли указанный пользователь
+        const userCheck = await db.query(`SELECT user_id FROM users WHERE user_id = $1`, [friendId]);
         if (userCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Пользователь не найден' });
         }
@@ -57,8 +57,8 @@ const addFriend = async (req, res) => {
         // Проверяем, не существует ли уже такой запрос
         const existingRequest = await db.query(`
             SELECT * FROM friends 
-            WHERE (user_id = $1 AND friend_id = $2) 
-               OR (user_id = $2 AND friend_id = $1)
+            WHERE (user_first = $1 AND user_second = $2) 
+               OR (user_first = $2 AND user_second = $1)
         `, [userId, friendId]);
 
         if (existingRequest.rows.length > 0) {
@@ -67,19 +67,9 @@ const addFriend = async (req, res) => {
 
         // Создаём запрос на дружбу
         await db.query(`
-            INSERT INTO friends (user_id, friend_id, status) 
+            INSERT INTO friends (user_first, user_second, status) 
             VALUES ($1, $2, 'pending')
         `, [userId, friendId]);
-
-        // Уведомляем через WebSocket
-        if (req.io) {
-            const friendRoom = `user:${friendId}`;
-            req.io.to(friendRoom).emit('friend:update', {
-                type: 'friend_request',
-                userId: userId,
-                message: `User ${userId} отправил вам запрос в друзья.`,
-            });
-        }
 
         res.status(201).json({ message: 'Friend request sent successfully' });
     } catch (error) {
@@ -92,7 +82,7 @@ const addFriend = async (req, res) => {
 const ansRequest = async (req, res) => {
     try {
         const userId = req.user.userId;
-        const { requestId } = req.params;
+        const { friendshipId } = req.params;
         const { action } = req.body; // action: "accept" or "decline"
 
         if (!action || !['accept', 'decline'].includes(action)) {
@@ -102,8 +92,8 @@ const ansRequest = async (req, res) => {
         // Проверяем, существует ли запрос
         const request = await db.query(`
             SELECT * FROM friends 
-            WHERE id = $1 AND friend_id = $2 AND status = 'pending'
-        `, [requestId, userId]);
+            WHERE friendship_id = $1 AND user_second = $2 AND status = 'pending'
+        `, [friendshipId, userId]);
 
         if (request.rows.length === 0) {
             return res.status(404).json({ error: 'Friend request not found' });
@@ -114,24 +104,8 @@ const ansRequest = async (req, res) => {
         await db.query(`
             UPDATE friends 
             SET status = $1 
-            WHERE id = $2
-        `, [newStatus, requestId]);
-
-        // Уведомление через Socket.IO
-        if (req.io && action === 'accept') {
-            const senderId = request.rows[0].user_id;
-            const recipientRoom = `user:${senderId}`;
-
-            req.io.to(recipientRoom).emit('friend:update', {
-                type: 'friend_request_response',
-                message: `User ${userId} accepted your friend request.`,
-            });
-
-            req.io.to(`user:${userId}`).emit('friend:update', {
-                type: 'friend_request_response',
-                message: `Friend request from user ${senderId} has been accepted.`,
-            });
-        }
+            WHERE friendship_id = $2
+        `, [newStatus, friendshipId]);
 
         res.json({ message: `Friend request ${newStatus}` });
     } catch (error) {
@@ -144,28 +118,14 @@ const ansRequest = async (req, res) => {
 const deleteFriend = async (req, res) => {
     try {
         const userId = req.user.userId;
-        const { userId: friendId } = req.params;
+        const { friendId } = req.params;
 
-        // Удаляем связь между пользователями
+        // Удаляем запись о дружбе
         await db.query(`
             DELETE FROM friends 
-            WHERE (user_id = $1 AND friend_id = $2) 
-               OR (user_id = $2 AND friend_id = $1)
+            WHERE (user_first = $1 AND user_second = $2) 
+               OR (user_first = $2 AND user_second = $1)
         `, [userId, friendId]);
-
-        // Уведомляем через WebSocket
-        if (req.io) {
-            const friendRoom = `user:${friendId}`;
-            req.io.to(friendRoom).emit('friend:update', {
-                type: 'friend_remove',
-                message: `User ${userId} removed you as a friend.`,
-            });
-
-            req.io.to(`user:${userId}`).emit('friend:update', {
-                type: 'friend_remove',
-                message: `You removed user ${friendId} as a friend.`,
-            });
-        }
 
         res.json({ message: 'Friend removed successfully' });
     } catch (error) {
@@ -182,18 +142,18 @@ const userFriendList = async (req, res) => {
         const result = await db.query(`
             SELECT 
                 CASE 
-                    WHEN f.user_id = $1 THEN f.friend_id 
-                    ELSE f.user_id 
-                END AS id, 
-                u.username, 
+                    WHEN f.user_first = $1 THEN f.user_second 
+                    ELSE f.user_first 
+                END AS friend_id, 
+                u.user_name, 
                 u.display_name 
             FROM friends f
             JOIN users u 
-                ON u.id = CASE 
-                            WHEN f.user_id = $1 THEN f.friend_id 
-                            ELSE f.user_id 
+                ON u.user_id = CASE 
+                                WHEN f.user_first = $1 THEN f.user_second 
+                                ELSE f.user_first 
                           END
-            WHERE (f.user_id = $1 OR f.friend_id = $1) AND f.status = 'accepted'
+            WHERE (f.user_first = $1 OR f.user_second = $1) AND f.status = 'accepted'
         `, [userId]);
 
         res.json({

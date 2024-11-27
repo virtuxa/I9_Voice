@@ -16,8 +16,8 @@ const router = express.Router();
 
 router.get('/', authenticateToken, myFriendList); // Получение списка друзей
 router.post('/', authenticateToken, addFriend); // Отправка запроса на дружбу
-router.patch('/:requestId', authenticateToken, ansRequest); // Принятие/отклонение запроса на дружбу
-router.delete('/:userId', authenticateToken, deleteFriend); // Удаление друга
+router.patch('/:friendshipId', authenticateToken, ansRequest); // Принятие/отклонение запроса на дружбу
+router.delete('/:friendId', authenticateToken, deleteFriend); // Удаление друга
 
 // ------------------------------------------------------------------- //
 // Другие пользователи
