@@ -45,7 +45,7 @@ const addFriend = async (req, res) => {
         }
 
         // Проверка: пользователь не может добавить сам себя
-        if (userId === friendId) {
+        if (userId == friendId) {
             return res.status(400).json({ error: 'Пользователь не может добавить в друзья сам себя' });
         }
 

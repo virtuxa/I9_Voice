@@ -37,7 +37,7 @@ const register = async (req, res) => {
         await db.query(
             `INSERT INTO user_profiles (user_id, status, description) 
              VALUES ($1, $2, $3)`,
-            [user.user_id, 'offline', 'New user']
+            [user.user_id, 'online', 'New user']
         );
 
         // Генерируем токены
