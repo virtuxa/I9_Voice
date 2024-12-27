@@ -9,7 +9,10 @@ const register = async (req, res) => {
 
         // Проверяем, что все обязательные поля заполнены
         if (!user_name || !display_name || !email || !password || !birth_date) {
-            return res.status(400).json({ error: 'Все поля обязательны для заполнения' });
+            return res.status(400).json({
+                status: 1,
+                error: 'All fields are required' 
+            });
         }
 
         // Проверяем уникальность имени пользователя, email и номера телефона (если указан)
@@ -18,7 +21,10 @@ const register = async (req, res) => {
             [user_name, email, phone_number]
         );
         if (userExists.rows.length > 0) {
-            return res.status(400).json({ error: 'Имя пользователя, email или номер телефона уже заняты' });
+            return res.status(400).json({ 
+                status: 1,
+                error: 'Username, email or phone number already taken' 
+            });
         }
 
         // Хэшируем пароль
@@ -55,7 +61,8 @@ const register = async (req, res) => {
 
         // Возвращаем успешный ответ
         res.status(201).json({
-            message: 'Регистрация прошла успешно',
+            status: 0,
+            message: 'Registration successful',
             user,
             tokens: {
                 accessToken,
@@ -63,8 +70,11 @@ const register = async (req, res) => {
             },
         });
     } catch (error) {
-        console.error('Ошибка при регистрации:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Error during registration:', error.message);
+        res.status(500).json({ 
+            status: 1,
+            error: 'Server error' 
+        });
     }
 };
 
@@ -75,7 +85,10 @@ const login = async (req, res) => {
 
         // Проверяем, что все поля заполнены
         if (!login || !password) {
-            return res.status(400).json({ error: 'Логин и пароль обязательны' });
+            return res.status(400).json({ 
+                status: 1,
+                error: 'Login and password are required'
+            });
         }
 
         // Ищем пользователя по имени пользователя, email или номеру телефона
@@ -88,13 +101,19 @@ const login = async (req, res) => {
         const user = result.rows[0];
 
         if (!user) {
-            return res.status(401).json({ error: 'Неверный логин или пароль' });
+            return res.status(401).json({ 
+                status: 1,
+                error: 'Invalid login or password'
+            });
         }
 
         // Сравниваем пароль
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Неверный логин или пароль' });
+            return res.status(401).json({
+                status: 1,
+                error: 'Invalid login or password'
+            });
         }
 
         // Генерируем токены
@@ -112,7 +131,8 @@ const login = async (req, res) => {
 
         // Возвращаем успешный ответ
         res.json({
-            message: 'Авторизация прошла успешно',
+            status: 0,
+            message: 'Authorization successful',
             user: {
                 user_id: user.user_id,
                 user_name: user.user_name,
@@ -126,8 +146,11 @@ const login = async (req, res) => {
             },
         });
     } catch (error) {
-        console.error('Ошибка при авторизации:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Error during authorization:', error.message);
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -138,7 +161,10 @@ const logout = async (req, res) => {
 
         // Проверяем, что refreshToken передан
         if (!refreshToken) {
-            return res.status(400).json({ error: 'Refresh token обязателен' });
+            return res.status(400).json({ 
+                status: 1,
+                error: 'Refresh token is required'
+            });
         }
 
         // Проверяем, существует ли токен
@@ -148,7 +174,10 @@ const logout = async (req, res) => {
         );
 
         if (tokenExists.rows.length === 0) {
-            return res.status(404).json({ error: 'Токен не найден' });
+            return res.status(404).json({
+                status: 1,
+                error: 'Token not found'
+            });
         }
 
         // Удаляем токен
@@ -157,10 +186,16 @@ const logout = async (req, res) => {
             [refreshToken]
         );
 
-        res.json({ message: 'Вы успешно вышли из профиля' });
+        res.json({
+            status: 0,
+            message: 'You have successfully logged out'
+        });
     } catch (error) {
-        console.error('Ошибка при выходе из профиля:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Error during logout:', error.message);
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -171,7 +206,10 @@ const refreshToken = async (req, res) => {
 
         // Проверяем, что refreshToken передан
         if (!refreshToken) {
-            return res.status(400).json({ error: 'Refresh token обязателен' });
+            return res.status(400).json({ 
+                status: 1,
+                error: 'Refresh token is required'
+            });
         }
 
         // Проверяем валидность токена
@@ -188,15 +226,19 @@ const refreshToken = async (req, res) => {
         );
 
         res.json({
-            message: 'Токены успешно обновлены',
+            status: 0,
+            message: 'Tokens updated successfully',
             tokens: {
                 accessToken: newAccessToken,
                 refreshToken: newRefreshToken,
             },
         });
     } catch (error) {
-        console.error('Ошибка при обновлении токенов:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Error during token update:', error.message);
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 

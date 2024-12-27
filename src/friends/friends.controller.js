@@ -24,12 +24,15 @@ const myFriendList = async (req, res) => {
         `, [userId]);
 
         res.json({
+            status: 0,
             message: 'Friend list retrieved successfully',
             friends: result.rows,
         });
     } catch (error) {
         console.error('Error fetching friend list:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error' });
     }
 };
 
@@ -41,18 +44,24 @@ const addFriend = async (req, res) => {
         const io = req.io; // Получаем экземпляр io из запроса
 
         if (!friendId) {
-            return res.status(400).json({ error: 'Требуется ID друга' });
+            return res.status(400).json({ 
+            status: 1,
+            error: 'Friend ID is required' });
         }
 
         // Проверка: пользователь не может добавить сам себя
         if (userId == friendId) {
-            return res.status(400).json({ error: 'Пользователь не может добавить в друзья сам себя' });
+            return res.status(400).json({ 
+            status: 1,
+            error: 'User cannot add himself to friends' });
         }
 
         // Проверяем, существует ли указанный пользователь
         const userCheck = await db.query(`SELECT user_id FROM users WHERE user_id = $1`, [friendId]);
         if (userCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'Пользователь не найден' });
+            return res.status(404).json({ 
+            status: 1,
+            error: 'User not found' });
         }
 
         // Проверяем, не существует ли уже такой запрос
@@ -63,7 +72,10 @@ const addFriend = async (req, res) => {
         `, [userId, friendId]);
 
         if (existingRequest.rows.length > 0) {
-            return res.status(400).json({ error: 'Запрос существует или пользователи уже являются друзьями' });
+            return res.status(400).json({ 
+                status: 1,
+                error: 'Request already exists or users are already friends'
+            });
         }
 
         // Создаём запрос на дружбу
@@ -75,13 +87,19 @@ const addFriend = async (req, res) => {
         // Уведомление пользователя о новом запросе
         io.to(`user:${friendId}`).emit('friends:newRequest', {
             from: userId,
-            message: 'Новый запрос в друзья',
+            message: 'New friend request',
         });
 
-        res.status(201).json({ message: 'Friend request sent successfully' });
+        res.status(201).json({ 
+            status: 0,
+            message: 'Friend request sent successfully'
+        });
     } catch (error) {
-        console.error('Ошибка отправки запроса дружбы:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error sending friend request:', error.message);
+        res.status(500).json({ 
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -94,7 +112,10 @@ const ansRequest = async (req, res) => {
         const io = req.io; // Получаем экземпляр io из запроса
 
         if (!action || !['accept', 'decline'].includes(action)) {
-            return res.status(400).json({ error: 'Invalid action. Use "accept" or "decline"' });
+            return res.status(400).json({ 
+                status: 1,
+                error: 'Invalid action. Use "accept" or "decline"'
+            });
         }
 
         // Проверяем, существует ли запрос
@@ -104,7 +125,10 @@ const ansRequest = async (req, res) => {
         `, [friendshipId, userId]);
 
         if (request.rows.length === 0) {
-            return res.status(404).json({ error: 'Friend request not found' });
+            return res.status(404).json({ 
+                status: 1,
+                error: 'Friend request not found'
+            });
         }
 
         // Обновляем статус запроса
@@ -125,7 +149,10 @@ const ansRequest = async (req, res) => {
         `, [userId]);
 
         if (userInfo.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ 
+                status: 1,
+                error: 'User not found'
+            });
         }
 
         const { user_name, display_name } = userInfo.rows[0];
@@ -134,13 +161,20 @@ const ansRequest = async (req, res) => {
         io.to(`user:${user_first}`).emit('friends:requestResponded', {
             friendshipId,
             status: newStatus,
+            message: 'Friend request responded',
             user: { user_id: userId, user_name, display_name }, // Добавляем информацию о пользователе
             });
 
-        res.json({ message: `Friend request ${newStatus}` });
+        res.json({ 
+            status: 0,
+            message: `Friend request ${newStatus}`
+        });
     } catch (error) {
         console.error('Error responding to friend request:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -161,13 +195,19 @@ const deleteFriend = async (req, res) => {
         // Уведомление об удалении
         io.to(`user:${friendId}`).emit('friends:removed', {
             by: userId,
-            message: 'Вы были удалены из друзей',
+            message: 'You have been removed from friends',
         });
 
-        res.json({ message: 'Friend removed successfully' });
+        res.json({ 
+            status: 0,
+            message: 'Friend removed successfully' 
+        });
     } catch (error) {
         console.error('Error removing friend:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -194,12 +234,16 @@ const userFriendList = async (req, res) => {
         `, [userId]);
 
         res.json({
+            status: 0,
             message: 'Friend list retrieved successfully',
             friends: result.rows,
         });
     } catch (error) {
         console.error('Error fetching user friend list:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 

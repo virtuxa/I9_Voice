@@ -3,20 +3,38 @@ const db = require('../database/db'); // Утилита для работы с �
 
 // Очистка истёкших сессий
 const scheduleSessionCleanup = () => {
-    cron.schedule('0 0 * * *', async () => { // Запуск каждый день в полночь
+    // Добавляем конфигурируемый интервал
+    const CLEANUP_INTERVAL = process.env.TOKEN_CLEANUP_INTERVAL || '0 0 * * *';
+    const TOKEN_EXPIRY_DAYS = process.env.TOKEN_EXPIRY_DAYS || 7;
+
+    cron.schedule(CLEANUP_INTERVAL, async () => {
         try {
+            // Добавляем метрики времени выполнения
+            const startTime = Date.now();
+            
             const result = await db.query(
-                `DELETE FROM sessions 
-                 WHERE id IN (
-                     SELECT id FROM sessions 
-                     WHERE refresh_token NOT IN (
-                         SELECT refresh_token FROM refresh_tokens
-                     )
-                 )`
+                `DELETE FROM refresh_tokens
+                 WHERE created_at < NOW() - INTERVAL '${TOKEN_EXPIRY_DAYS} days'
+                 RETURNING COUNT(*)`
             );
-            console.log(`Очищено сессий: ${result.rowCount}`);
+
+            const duration = Date.now() - startTime;
+            
+            // Улучшенное логирование
+            console.log({
+                event: 'session_cleanup',
+                deletedCount: result.rowCount,
+                durationMs: duration,
+                timestamp: new Date().toISOString()
+            });
         } catch (error) {
-            console.error('Ошибка при очистке устаревших сессий:', error.message);
+            // Более детальное логирование ошибок
+            console.error({
+                event: 'session_cleanup_error',
+                error: error.message,
+                stack: error.stack,
+                timestamp: new Date().toISOString()
+            });
         }
     });
 };

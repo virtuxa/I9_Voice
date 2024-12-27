@@ -12,9 +12,8 @@ const pool = new Pool({
 // Функция инициализации базы данных
 const initDatabase = async () => {
     try {
-
         // ------------------------------------------------------------------- //
-
+        
         // Создание таблицы users
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
@@ -71,9 +70,9 @@ const initDatabase = async () => {
 
         // ------------------------------------------------------------------- //
 
-        console.log('База данных инициализирована.');
+        console.log('Database initialized.');
     } catch (error) {
-        console.error('Ошибка инициализации базы данных:', error.message);
+        console.error('Error initializing database:', error.message);
     }
 };
 

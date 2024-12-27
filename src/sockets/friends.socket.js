@@ -64,7 +64,10 @@ const configureFriendsSocket = (io) => {
                 `, [userId, friendId]);
 
                 // Уведомляем пользователя о новом запросе
-                io.to(`user:${friendId}`).emit('friends:newRequest', { from: userId });
+                io.to(`user:${friendId}`).emit('friends:newRequest', { 
+                    from: userId,
+                    message: 'New friend request'
+                });
 
                 callback({ success: true, message: 'Friend request sent successfully' });
             } catch (error) {
@@ -102,12 +105,14 @@ const configureFriendsSocket = (io) => {
                 io.to(`user:${user_first}`).emit('friends:requestResponded', {
                     friendshipId,
                     status: newStatus,
+                    message: 'Friend request responded'
                 });
 
                 // Уведомляем принимающего
                 io.to(`user:${userId}`).emit('friends:statusUpdated', {
                     friendshipId,
                     status: newStatus,
+                    message: 'Friend request responded'
                 });
 
                 callback({ success: true, message: `Friend request ${newStatus}` });
@@ -126,7 +131,10 @@ const configureFriendsSocket = (io) => {
                        OR (user_first = $2 AND user_second = $1)
                 `, [userId, friendId]);
 
-                io.to(`user:${friendId}`).emit('friends:removed', { by: userId });
+                io.to(`user:${friendId}`).emit('friends:removed', { 
+                    by: userId,
+                    message: 'You have been removed from friends'
+                });
 
                 callback({ success: true, message: 'Friend removed successfully' });
             } catch (error) {

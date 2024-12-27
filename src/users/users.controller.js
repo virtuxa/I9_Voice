@@ -1,25 +1,46 @@
 const db = require('../database/db');
 const bcrypt = require('bcryptjs');
 
+// Общая функция для получения профиля
+const getUserProfileById = async (userId, includePrivateData = false) => {
+    const fields = [
+        'user_id', 'user_name', 'display_name', 'email', 'birth_date'
+    ];
+    
+    if (includePrivateData) {
+        fields.push('phone_number', 'created_at');
+    }
+
+    const result = await db.query(
+        `SELECT ${fields.join(', ')} FROM users WHERE user_id = $1`,
+        [userId]
+    );
+
+    return result.rows[0];
+};
+
 // Получение информации о текущем пользователе
 const getCurrentUserProfile = async (req, res) => {
     try {
-        const userId = req.user.userId;
-
-        const result = await db.query(
-            `SELECT user_id, user_name, display_name, email, phone_number, birth_date, created_at 
-             FROM users WHERE user_id = $1`,
-            [userId]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+        const user = await getUserProfileById(req.user.userId, true);
+        
+        if (!user) {
+            return res.status(404).json({
+                status: 1,
+                error: 'User not found'
+            });
         }
 
-        res.json(result.rows[0]);
+        res.json({
+            status: 0,
+            data: user
+        });
     } catch (error) {
         console.error('Error fetching user profile:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -47,7 +68,9 @@ const patchProfile = async (req, res) => {
         }
 
         if (updates.length === 0) {
-            return res.status(400).json({ error: 'Нет данных для обновления' });
+            return res.status(400).json({ 
+                status: 1,
+                error: 'No data to update' });
         }
 
         values.push(userId);
@@ -60,10 +83,15 @@ const patchProfile = async (req, res) => {
 
         await db.query(query, values);
 
-        res.json({ message: 'Profile updated successfully' });
+        res.json({
+            status: 0,
+            message: 'Profile updated successfully' });
     } catch (error) {
         console.error('Error updating user profile:', error.message, error.stack);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -74,10 +102,16 @@ const deleteProfile = async (req, res) => {
 
         await db.query(`DELETE FROM users WHERE user_id = $1`, [userId]);
 
-        res.json({ message: 'Profile deleted successfully' });
+        res.json({ 
+            status: 0,
+            message: 'Profile deleted successfully'
+        });
     } catch (error) {
         console.error('Error deleting user profile:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -93,13 +127,21 @@ const getUserDetails = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Details not found' });
+            return res.status(404).json({
+                status: 1,
+                error: 'Details not found' });
         }
 
-        res.json(result.rows[0]);
+        res.json({
+            status: 0,
+            data: result.rows[0]
+        });
     } catch (error) {
         console.error('Error fetching user details:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -127,7 +169,10 @@ const patchUserDetails = async (req, res) => {
         }
 
         if (fields.length === 0) {
-            return res.status(400).json({ error: 'No fields provided for update' });
+            return res.status(400).json({
+                status: 1,
+                error: 'No fields provided for update'
+            });
         }
 
         values.push(userId);
@@ -140,10 +185,14 @@ const patchUserDetails = async (req, res) => {
             values
         );
 
-        res.json({ message: 'Details updated successfully' });
+        res.json({
+            status: 0,
+            message: 'Details updated successfully' });
     } catch (error) {
         console.error('Error updating user details:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({ 
+            status: 1,
+            error: 'Server error' });
     }
 };
 
@@ -163,32 +212,41 @@ const deleteUserDetails = async (req, res) => {
             [userId]
         );
 
-        res.json({ message: 'Details set to NULL successfully' });
+        res.json({ 
+            status: 0,
+            message: 'Details set to NULL successfully'
+        });
     } catch (error) {
         console.error('Error setting user details to NULL:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
 // Получение информации о другом пользователе
 const getUserProfile = async (req, res) => {
     try {
-        const userId = req.params.user_id;
-
-        const result = await db.query(
-            `SELECT user_id, user_name, display_name, email, birth_date 
-             FROM users WHERE user_id = $1`,
-            [userId]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+        const user = await getUserProfileById(req.params.user_id, false);
+        
+        if (!user) {
+            return res.status(404).json({
+                status: 1,
+                error: 'User not found'
+            });
         }
 
-        res.json(result.rows[0]);
+        res.json({
+            status: 0,
+            data: user
+        });
     } catch (error) {
         console.error('Error fetching another user profile:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -204,13 +262,22 @@ const getUserDetailsById = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Details not found for the user' });
+            return res.status(404).json({
+                status: 1,
+                error: 'Details not found for the user'
+            });
         }
 
-        res.json(result.rows[0]);
+        res.json({
+            status: 0,
+            data: result.rows[0]
+        });
     } catch (error) {
         console.error('Error fetching user details by ID:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 
@@ -221,7 +288,10 @@ const changePassword = async (req, res) => {
         const { currentPassword, newPassword } = req.body; // Текущий и новый пароли из тела запроса
 
         if (!currentPassword || !newPassword) {
-            return res.status(400).json({ error: 'Both current and new passwords are required' });
+            return res.status(400).json({ 
+                status: 1,
+                error: 'Both current and new passwords are required'
+            });
         }
 
         // Получаем текущий хэш пароля из базы данных
@@ -232,13 +302,19 @@ const changePassword = async (req, res) => {
 
         const user = result.rows[0];
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({
+                status: 1,
+                error: 'User not found'
+            });
         }
 
         // Проверяем текущий пароль
         const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
         if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Current password is incorrect' });
+            return res.status(401).json({ 
+                status: 1,
+                error: 'Current password is incorrect'
+            });
         }
 
         // Хэшируем новый пароль
@@ -250,10 +326,16 @@ const changePassword = async (req, res) => {
             [hashedPassword, userId]
         );
 
-        res.json({ message: 'Password updated successfully' });
+        res.json({
+            status: 0,
+            message: 'Password updated successfully'
+        });
     } catch (error) {
         console.error('Error changing password:', error.message);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        res.status(500).json({
+            status: 1,
+            error: 'Server error'
+        });
     }
 };
 

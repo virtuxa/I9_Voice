@@ -59,10 +59,10 @@ const startServer = async () => {
 
         // Запускаем сервер
         server.listen(SV_PORT, () => {
-            console.log( `Сервер запущен на http://${SV_HOST}:${SV_PORT}` );
+            console.log( `Server started on http://${SV_HOST}:${SV_PORT}` );
         });
     } catch ( error ) { // Завершение при ошибке
-        console.error( 'Ошибка при запуске сервера:', error.message );
+        console.error( 'Error starting server:', error.message );
         process.exit( 1 );
     }
 };
