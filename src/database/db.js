@@ -12,8 +12,6 @@ const pool = new Pool({
 // Функция инициализации базы данных
 const initDatabase = async () => {
     try {
-        // ------------------------------------------------------------------- //
-        
         // Создание таблицы users
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
