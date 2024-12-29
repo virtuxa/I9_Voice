@@ -14,8 +14,7 @@ const scheduleSessionCleanup = () => {
             
             const result = await db.query(
                 `DELETE FROM refresh_tokens
-                 WHERE created_at < NOW() - INTERVAL '${TOKEN_EXPIRY_DAYS} days'
-                 RETURNING COUNT(*)`
+                 WHERE created_at < NOW() - INTERVAL '${TOKEN_EXPIRY_DAYS} days'`
             );
 
             const duration = Date.now() - startTime;
