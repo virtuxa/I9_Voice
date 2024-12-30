@@ -52,11 +52,6 @@ const initDatabase = async () => {
             );
         `);
 
-        // Создание таблицы chats, если она не существует
-        // 
-
-        // ------------------------------------------------------------------- //
-
         // Создание таблицы refresh_tokens
         await pool.query(`
             CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -66,7 +61,40 @@ const initDatabase = async () => {
             );
         `);
 
-        // ------------------------------------------------------------------- //
+        // Создание таблицы chats и связанных таблиц в правильном порядке
+        await pool.query(`
+            -- Таблица чатов
+            CREATE TABLE IF NOT EXISTS chats (
+                chat_id SERIAL PRIMARY KEY,
+                chat_type VARCHAR(10) NOT NULL, -- 'private' или 'group'
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                name VARCHAR(255), -- для групповых чатов
+                is_voice_enabled BOOLEAN DEFAULT false -- для будущей поддержки голоса
+            );
+        `);
+
+        await pool.query(`
+            -- Участники чата
+            CREATE TABLE IF NOT EXISTS chat_members (
+                chat_id INT REFERENCES chats(chat_id) ON DELETE CASCADE,
+                user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                role VARCHAR(20) DEFAULT 'member', -- 'admin', 'member'
+                PRIMARY KEY (chat_id, user_id)
+            );
+        `);
+
+        await pool.query(`
+            -- Сообщения
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                message_id SERIAL PRIMARY KEY,
+                chat_id INT REFERENCES chats(chat_id) ON DELETE CASCADE,
+                sender_id INT REFERENCES users(user_id) ON DELETE CASCADE,
+                content TEXT,
+                message_type VARCHAR(10) DEFAULT 'text', -- 'text', 'voice' (для будущего)
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
 
         console.log('Database initialized.');
     } catch (error) {

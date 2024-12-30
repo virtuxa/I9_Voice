@@ -12,6 +12,7 @@ const scheduleSessionCleanup = require('./src/utils/cleanup');
 const authRoutes = require('./src/auth/auth.routes');
 const usersRoutes = require('./src/users/users.routes');
 const friendsRoutes = require('./src/friends/friends.routes');
+const chatsRoutes = require('./src/chats/chats.routes');
 
 // Инициализируем переменные
 const app = express();
@@ -42,6 +43,7 @@ app.use( express.json() );
 app.use('/auth', authRoutes);
 app.use('/users', usersRoutes);
 app.use('/friends', friendsRoutes);
+app.use('/chats', chatsRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {
