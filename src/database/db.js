@@ -91,7 +91,6 @@ const initDatabase = async () => {
                 chat_id INT REFERENCES chats(chat_id) ON DELETE CASCADE,
                 sender_id INT REFERENCES users(user_id) ON DELETE CASCADE,
                 content TEXT,
-                message_type VARCHAR(10) DEFAULT 'text', -- 'text', 'voice' (для будущего)
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);

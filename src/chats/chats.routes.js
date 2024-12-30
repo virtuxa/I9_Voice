@@ -20,7 +20,6 @@ const {
 const router = express.Router();
 
 // ------------------------------------------------------------------- //
-// 
 
 // Чаты
 router.get('/', authenticateToken, getMyChats); // Получение списка чатов пользователя
